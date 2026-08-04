@@ -10,7 +10,7 @@ services:
     name: desihub-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     plan: free
     healthCheckPath: /api/videos/
     envVars:

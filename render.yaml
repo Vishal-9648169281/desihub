@@ -1,0 +1,73 @@
+databases:
+  - name: desihub-db
+    databaseName: desihub
+    user: desihub
+    plan: free
+    postgresMajorVersion: 16
+
+services:
+  - type: web
+    name: desihub-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /api/videos/
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://desihub-frontend.onrender.com"
+      - key: MAX_VIDEO_UPLOAD_SIZE_MB
+        value: "512"
+      - key: SEED_DEMO_DATA
+        value: "True"
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: desihub-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: desihub-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: desihub-db
+          property: password
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: desihub-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: desihub-db
+          property: port
+
+  - type: web
+    name: desihub-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: /api
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://desihub-backend.onrender.com/api/*
+      - type: rewrite
+        source: /admin/*
+        destination: https://desihub-backend.onrender.com/admin/*
+      - type: rewrite
+        source: /media/*
+        destination: https://desihub-backend.onrender.com/media/*
+      - type: rewrite
+        source: /static/*
+        destination: https://desihub-backend.onrender.com/static/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

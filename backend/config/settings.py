@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,6 +13,15 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
 if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
     ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
+
+# Render (and similar PaaS) terminate TLS at a proxy and forward plain HTTP to the
+# container. Without this, Django thinks every request is HTTP, which makes the
+# Origin (https://...) mismatch what Django expects and breaks CSRF-protected POSTs
+# (e.g. Django admin login).
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = [
+    o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "https://*.onrender.com").split(",") if o
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -62,16 +72,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "desihub"),
-        "USER": os.environ.get("POSTGRES_USER", "desihub"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "desihub"),
-        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
-        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+# Render's managed Postgres (and most other PaaS databases) are provided as a single
+# DATABASE_URL. Prefer it when set; otherwise fall back to the individual POSTGRES_*
+# vars used by local development and docker-compose (neither of which sets DATABASE_URL,
+# so that path is unchanged).
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {"default": dj_database_url.config(env="DATABASE_URL")}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB", "desihub"),
+            "USER": os.environ.get("POSTGRES_USER", "desihub"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "desihub"),
+            "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
     }
-}
 
 AUTH_USER_MODEL = "accounts.User"
 
